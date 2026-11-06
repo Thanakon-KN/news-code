@@ -199,13 +199,15 @@ function autoLinkText(value) {
 }
 
 function propertyState(properties, names) {
+  const states = [];
   for (const name of names) {
     const element = firstChild(properties, name);
     if (!element) continue;
     const value = wordValue(element).toLowerCase();
-    return !['0', 'false', 'off', 'none'].includes(value);
+    states.push(!['0', 'false', 'off', 'none'].includes(value));
   }
-  return undefined;
+  if (!states.length) return undefined;
+  return states.includes(true);
 }
 
 function formatProperties(properties) {
