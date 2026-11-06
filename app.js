@@ -1,0 +1,627 @@
+const WORD_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const PLACEHOLDER = '<figure class="text-center"><img class="img-fluid" src="xxx"></figure>';
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const decoder = new TextDecoder('utf-8');
+
+const fileInput = document.querySelector('#docx-files');
+const dropzone = document.querySelector('#dropzone');
+const fileList = document.querySelector('#file-list');
+const fileCount = document.querySelector('#file-count');
+const convertButton = document.querySelector('#convert');
+const clearButton = document.querySelector('#clear');
+const statusNode = document.querySelector('#status');
+const resultSection = document.querySelector('#results');
+const resultCards = document.querySelector('#result-cards');
+const headlineControl = document.querySelector('#skip-headline');
+const workflowSteps = Array.from(document.querySelectorAll('.workflow-step'));
+const workflowRules = Array.from(document.querySelectorAll('.workflow-rule'));
+
+let selectedFiles = [];
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+}
+
+function keepSpaces(value) {
+  return escapeHtml(value).replace(/ {2,}/g, spaces => '&nbsp;'.repeat(spaces.length - 1) + ' ');
+}
+
+function directChildren(node, localName) {
+  return Array.from(node?.children || []).filter(child => child.localName === localName);
+}
+
+function firstChild(node, localName) {
+  return directChildren(node, localName)[0] || null;
+}
+
+function descendants(node, localName) {
+  return Array.from(node.getElementsByTagNameNS(WORD_NS, localName));
+}
+
+function wordValue(node) {
+  return node?.getAttributeNS(WORD_NS, 'val') || node?.getAttribute('w:val') || '';
+}
+
+function xmlDocument(source, name) {
+  if (!source) throw new Error(`DOCX ไม่มี ${name}`);
+  const xml = new DOMParser().parseFromString(source, 'application/xml');
+  if (xml.getElementsByTagName('parsererror').length) throw new Error(`อ่าน ${name} ไม่ได้`);
+  return xml;
+}
+
+async function inflateEntry(bytes, method) {
+  if (method === 0) return bytes;
+  if (method !== 8) throw new Error(`ไฟล์ DOCX ใช้การบีบอัดที่ไม่รองรับ (${method})`);
+  if (!('DecompressionStream' in window)) throw new Error('เบราว์เซอร์นี้ยังไม่รองรับการอ่าน DOCX แบบบีบอัด');
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function readDocxEntries(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const searchStart = Math.max(0, bytes.length - 65_557);
+  let endOffset = -1;
+  for (let offset = bytes.length - 22; offset >= searchStart; offset--) {
+    if (view.getUint32(offset, true) === 0x06054b50) { endOffset = offset; break; }
+  }
+  if (endOffset < 0) throw new Error('ไฟล์นี้ไม่ใช่ DOCX ที่รองรับ');
+  const entryCount = view.getUint16(endOffset + 10, true);
+  let cursor = view.getUint32(endOffset + 16, true);
+  if (entryCount > 2000) throw new Error('ไฟล์มีรายการภายในมากเกินกว่าจะประมวลผลได้');
+
+  const required = new Set([
+    'word/document.xml',
+    'word/_rels/document.xml.rels',
+    'word/numbering.xml',
+    'word/styles.xml'
+  ]);
+  const contents = new Map();
+
+  for (let index = 0; index < entryCount; index++) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) throw new Error('อ่านสารบัญ ZIP ของไฟล์ DOCX ไม่ได้');
+    const method = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const uncompressedSize = view.getUint32(cursor + 24, true);
+    const nameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localOffset = view.getUint32(cursor + 42, true);
+    const name = decoder.decode(bytes.subarray(cursor + 46, cursor + 46 + nameLength));
+
+    if (required.has(name)) {
+      if (uncompressedSize > 25 * 1024 * 1024) throw new Error('ส่วนข้อความในไฟล์มีขนาดเกินกำหนด');
+      if (view.getUint32(localOffset, true) !== 0x04034b50) throw new Error('อ่านรายการภายใน DOCX ไม่ได้');
+      const localNameLength = view.getUint16(localOffset + 26, true);
+      const localExtraLength = view.getUint16(localOffset + 28, true);
+      const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+      const compressed = bytes.subarray(dataStart, dataStart + compressedSize);
+      const content = await inflateEntry(compressed, method);
+      contents.set(name, decoder.decode(content));
+    }
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+  return contents;
+}
+
+function parseRelationships(xmlSource) {
+  if (!xmlSource) return new Map();
+  const xml = xmlDocument(xmlSource, 'document relationships');
+  return new Map(Array.from(xml.getElementsByTagName('Relationship')).map(relationship => [
+    relationship.getAttribute('Id'),
+    { target: relationship.getAttribute('Target') || '', external: relationship.getAttribute('TargetMode') === 'External' }
+  ]));
+}
+
+function parseStyles(xmlSource) {
+  if (!xmlSource) return new Map();
+  const xml = xmlDocument(xmlSource, 'styles');
+  const styles = new Map();
+  for (const style of Array.from(xml.getElementsByTagNameNS(WORD_NS, 'style'))) {
+    const id = style.getAttributeNS(WORD_NS, 'styleId') || style.getAttribute('w:styleId');
+    const name = firstChild(style, 'name');
+    if (id) styles.set(id, name?.getAttributeNS(WORD_NS, 'val') || name?.getAttribute('w:val') || id);
+  }
+  return styles;
+}
+
+function parseNumbering(xmlSource) {
+  const numMap = new Map();
+  const formatMap = new Map();
+  if (!xmlSource) return { numMap, formatMap };
+  const xml = xmlDocument(xmlSource, 'numbering');
+  for (const num of Array.from(xml.getElementsByTagNameNS(WORD_NS, 'num'))) {
+    const numId = num.getAttributeNS(WORD_NS, 'numId') || num.getAttribute('w:numId');
+    const abstract = firstChild(num, 'abstractNumId');
+    if (numId && abstract) numMap.set(numId, wordValue(abstract));
+  }
+  for (const abstract of Array.from(xml.getElementsByTagNameNS(WORD_NS, 'abstractNum'))) {
+    const abstractId = abstract.getAttributeNS(WORD_NS, 'abstractNumId') || abstract.getAttribute('w:abstractNumId');
+    for (const level of directChildren(abstract, 'lvl')) {
+      const levelIndex = level.getAttributeNS(WORD_NS, 'ilvl') || level.getAttribute('w:ilvl') || '0';
+      const format = firstChild(level, 'numFmt');
+      const text = firstChild(level, 'lvlText');
+      formatMap.set(`${abstractId}:${levelIndex}`, {
+        format: wordValue(format) || 'bullet',
+        marker: wordValue(text)
+      });
+    }
+  }
+  return { numMap, formatMap };
+}
+
+function xmlTextOf(node) {
+  let text = '';
+  const visit = child => {
+    if (child.nodeType !== 1) return;
+    if (child.localName === 't') text += child.textContent || '';
+    else if (child.localName === 'tab') text += '\t';
+    else if (child.localName === 'br' || child.localName === 'cr') text += '\n';
+    else for (const nested of child.children) visit(nested);
+  };
+  visit(node);
+  return text;
+}
+
+function autoLinkText(value) {
+  const pattern = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi;
+  let output = '';
+  let cursor = 0;
+  for (const match of value.matchAll(pattern)) {
+    const raw = match[0];
+    const index = match.index ?? 0;
+    let link = raw;
+    let trailing = '';
+    while (/[.,;:!?)]$/.test(link)) { trailing = link.slice(-1) + trailing; link = link.slice(0, -1); }
+    output += keepSpaces(value.slice(cursor, index));
+    const href = /^www\./i.test(link) ? `https://${link}` : /^[A-Z0-9._%+-]+@/i.test(link) ? `mailto:${link}` : link;
+    output += `<a href="${escapeHtml(href)}" target="_blank">${keepSpaces(link)}</a>${escapeHtml(trailing)}`;
+    cursor = index + raw.length;
+  }
+  output += keepSpaces(value.slice(cursor));
+  return output;
+}
+
+function runFormatting(run) {
+  const properties = firstChild(run, 'rPr');
+  const hasOn = name => {
+    const element = firstChild(properties, name);
+    if (!element) return false;
+    const value = wordValue(element).toLowerCase();
+    return value !== '0' && value !== 'false' && value !== 'off' && value !== 'none';
+  };
+  const underlineElement = firstChild(properties, 'u');
+  const underline = underlineElement && wordValue(underlineElement).toLowerCase() !== 'none';
+  return { bold: hasOn('b') || hasOn('bCs'), italic: hasOn('i') || hasOn('iCs'), underline };
+}
+
+function wrapFormatting(html, format) {
+  if (format.underline) html = `<u>${html}</u>`;
+  if (format.italic) html = `<em>${html}</em>`;
+  if (format.bold) html = `<strong>${html}</strong>`;
+  return html;
+}
+
+function safeHref(target) {
+  const value = String(target || '').trim();
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(value)) return value;
+  if (/^www\./i.test(value)) return `https://${value}`;
+  return '';
+}
+
+function renderInline(node, relationships) {
+  if (node.nodeType !== 1) return '';
+  switch (node.localName) {
+    case 'pPr': case 'rPr': return '';
+    case 't': return autoLinkText(node.textContent || '');
+    case 'tab': return '&nbsp;&nbsp;&nbsp;';
+    case 'br': case 'cr': return '<br>';
+    case 'noBreakHyphen': return '&#8209;';
+    case 'softHyphen': return '&shy;';
+    case 'r': {
+      const inner = Array.from(node.children).map(child => renderInline(child, relationships)).join('');
+      return wrapFormatting(inner, runFormatting(node));
+    }
+    case 'hyperlink': {
+      const id = node.getAttributeNS(REL_NS, 'id') || node.getAttribute('r:id') || '';
+      const relationship = relationships.get(id);
+      const inner = Array.from(node.children).map(child => renderInline(child, relationships)).join('');
+      const href = relationship?.external ? safeHref(relationship.target) : '';
+      return href ? `<a href="${escapeHtml(href)}" target="_blank">${inner}</a>` : inner;
+    }
+    default: return Array.from(node.children || []).map(child => renderInline(child, relationships)).join('');
+  }
+}
+
+function countStyles(node) {
+  const runs = descendants(node, 'r').filter(run => xmlTextOf(run).trim());
+  let bold = 0;
+  let maxSize = 0;
+  for (const run of runs) {
+    const format = runFormatting(run);
+    if (format.bold) bold++;
+    const size = firstChild(firstChild(run, 'rPr'), 'sz');
+    maxSize = Math.max(maxSize, Number(wordValue(size)) || 0);
+  }
+  return { runCount: runs.length, boldCount: bold, maxSize };
+}
+
+function listProperties(paragraph, numbering) {
+  const paragraphProps = firstChild(paragraph, 'pPr');
+  const numPr = firstChild(paragraphProps, 'numPr');
+  if (!numPr) return null;
+  const numId = wordValue(firstChild(numPr, 'numId'));
+  const level = wordValue(firstChild(numPr, 'ilvl')) || '0';
+  if (!numId) return null;
+  const abstractId = numbering.numMap.get(numId);
+  const definition = numbering.formatMap.get(`${abstractId}:${level}`) || { format: 'bullet', marker: '' };
+  const ordered = !['bullet', 'none'].includes(definition.format);
+  const type = ({ upperRoman: 'I', lowerRoman: 'i', upperLetter: 'A', lowerLetter: 'a' })[definition.format];
+  return { id: numId, level: Number(level), ordered, type: type || '', format: definition.format };
+}
+
+function paragraphNode(paragraph, context) {
+  const text = xmlTextOf(paragraph);
+  const paragraphProps = firstChild(paragraph, 'pPr');
+  const styleId = wordValue(firstChild(paragraphProps, 'pStyle'));
+  const styleName = context.styles.get(styleId) || styleId;
+  const alignment = wordValue(firstChild(paragraphProps, 'jc'));
+  const runs = countStyles(paragraph);
+  const body = Array.from(paragraph.children).map(child => renderInline(child, context.relationships)).join('');
+  const size = runs.maxSize;
+  const isHeadingStyle = /^(title|subtitle|heading\s*[1-3])$/i.test(styleName || '');
+  const hasHeadlineLabel = /^\s*headline\s*:/i.test(text);
+  const candidate = hasHeadlineLabel || isHeadingStyle || (text.trim().length >= 24 && runs.runCount > 0 && runs.boldCount === runs.runCount && (alignment === 'center' || size >= 48));
+  return {
+    kind: 'paragraph', text, html: `<p>${body}</p>`, locale: detectLocale(text),
+    alignment, styleName, candidate, hasHeadlineLabel, list: listProperties(paragraph, context.numbering)
+  };
+}
+
+function parseTable(table, context) {
+  const rows = directChildren(table, 'tr').map(row => directChildren(row, 'tc').map(cell => {
+    const blocks = directChildren(cell, 'p').map(paragraph => paragraphNode(paragraph, context)).filter(block => block.text.trim());
+    return { text: blocks.map(block => block.text).join('\n'), html: blocks.map(block => block.html).join('\n'), blocks };
+  }));
+  const bodyLabels = /^(เนื้อข่าว|เนื้อหา|body|news body|article body|news content|content)$/i;
+  const labelText = rows.flatMap(row => row[0] ? row[0].text.split('\n') : []).map(value => value.trim()).filter(Boolean);
+  const contentRows = rows.filter(row => row[0] && row[0].text.split('\n').some(line => bodyLabels.test(line.trim())));
+  if (contentRows.length) {
+    const blocks = [];
+    for (const row of contentRows) for (const cell of row.slice(1)) blocks.push(...cell.blocks);
+    return { kind: 'formBody', blocks, ignoredMetadata: true };
+  }
+  const tableText = rows.flat().map(cell => cell.text).join(' ');
+  const tableHtml = `<table>\n<tbody>\n${rows.map(row => `<tr>${row.map(cell => `<td>${cell.html}</td>`).join('')}</tr>`).join('\n')}\n</tbody>\n</table>`;
+  return { kind: 'table', text: tableText, html: tableHtml, locale: detectLocale(tableText), candidate: false, labels: labelText };
+}
+
+function detectLocale(text) {
+  const thai = (text.match(/[\u0E00-\u0E7F]/g) || []).length;
+  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  if (thai && thai >= Math.max(2, latin * 0.12)) return 'TH';
+  if (latin || text.trim()) return 'EN';
+  return '';
+}
+
+function isLanguageLabel(text) {
+  return /^(ภาษาไทย|ภาษาอังกฤษ|ไทย|อังกฤษ|thai|english|th|en)$/i.test(text.trim());
+}
+
+function processHeadline(blocks, skipHeadline) {
+  if (!skipHeadline) return { blocks, skipped: [] };
+  const skipped = [];
+  const output = blocks.filter(block => {
+    if (block.kind !== 'paragraph') return true;
+    const plain = block.text.trim();
+    if (!plain || isLanguageLabel(plain)) return false;
+    if (block.candidate) { skipped.push(plain.replace(/^\s*headline\s*:\s*/i, '')); return false; }
+    return true;
+  });
+  return { blocks: output, skipped };
+}
+
+function renderListBlocks(blocks) {
+  const rendered = [];
+  let list = null;
+  const closeList = () => {
+    if (list) rendered.push(`</${list.tag}>`);
+    list = null;
+  };
+  for (const block of blocks) {
+    if (block.kind === 'paragraph' && block.list) {
+      const tag = block.list.ordered ? 'ol' : 'ul';
+      const key = `${block.list.id}:${block.list.level}:${tag}:${block.list.type}`;
+      if (!list || list.key !== key) {
+        closeList();
+        const typeAttribute = tag === 'ol' && block.list.type ? ` type="${block.list.type}"` : '';
+        list = { key, tag };
+        rendered.push(`<${tag}${typeAttribute}>`);
+      }
+      rendered.push(`<li>${block.html.replace(/^<p>|<\/p>$/g, '')}</li>`);
+    } else {
+      closeList();
+      rendered.push(block.html);
+    }
+  }
+  closeList();
+  return rendered.join('\n');
+}
+
+function groupByLanguage(blocks) {
+  const groups = { TH: [], EN: [] };
+  for (const block of blocks) {
+    const locale = block.locale || 'EN';
+    if (!isLanguageLabel(block.text || '')) groups[locale].push(block);
+  }
+  return Object.entries(groups).filter(([, group]) => group.length).map(([locale, group]) => ({
+    locale,
+    html: `${PLACEHOLDER}\n${renderListBlocks(group)}`
+  }));
+}
+
+async function readDocument(file, skipHeadline) {
+  if (!file.name.toLowerCase().endsWith('.docx')) throw new Error('รองรับเฉพาะไฟล์ .docx');
+  if (file.size > MAX_FILE_SIZE) throw new Error('ไฟล์มีขนาดเกิน 20 MB');
+  const entries = await readDocxEntries(file);
+  const documentXml = xmlDocument(entries.get('word/document.xml'), 'เอกสาร Word');
+  const relationships = parseRelationships(entries.get('word/_rels/document.xml.rels'));
+  const styles = parseStyles(entries.get('word/styles.xml'));
+  const numbering = parseNumbering(entries.get('word/numbering.xml'));
+  const context = { relationships, styles, numbering };
+  const body = documentXml.getElementsByTagNameNS(WORD_NS, 'body')[0];
+  if (!body) throw new Error('ไม่พบเนื้อหาในเอกสาร');
+
+  const blocks = [];
+  let ignoredMetadata = false;
+  for (const child of Array.from(body.children)) {
+    if (child.localName === 'p') {
+      const paragraph = paragraphNode(child, context);
+      if (paragraph.text.trim()) blocks.push(paragraph);
+    } else if (child.localName === 'tbl') {
+      const table = parseTable(child, context);
+      if (table.kind === 'formBody') { blocks.push(...table.blocks); ignoredMetadata = true; }
+      else if (table.text.trim()) blocks.push(table);
+    }
+  }
+  if (!blocks.length) throw new Error('ไม่พบข้อความข่าวใน DOCX');
+  const result = processHeadline(blocks, skipHeadline);
+  const outputs = groupByLanguage(result.blocks);
+  if (!outputs.length) throw new Error('ไม่พบข้อความที่สามารถแยกภาษาได้');
+  return {
+    outputs,
+    skipped: result.skipped,
+    paragraphCount: blocks.filter(block => block.kind === 'paragraph').length,
+    ignoredMetadata
+  };
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function setStatus(message, error = false) {
+  statusNode.textContent = message;
+  statusNode.classList.toggle('error', error);
+}
+
+function updateWorkflow(stage) {
+  workflowSteps.forEach(step => {
+    const stepNumber = Number(step.dataset.step);
+    step.classList.toggle('active', stepNumber === stage);
+    step.classList.toggle('completed', stepNumber < stage);
+    if (stepNumber === stage) step.setAttribute('aria-current', 'step');
+    else step.removeAttribute('aria-current');
+  });
+  workflowRules.forEach((rule, index) => rule.classList.toggle('completed', stage > index + 1));
+}
+
+function resetResults() {
+  resultCards.replaceChildren();
+  resultSection.hidden = true;
+}
+
+function updateFileView() {
+  fileList.replaceChildren();
+  selectedFiles.forEach((file, index) => {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    const icon = document.createElement('span');
+    icon.className = 'doc-icon';
+    icon.textContent = 'DOCX';
+    const info = document.createElement('span');
+    info.className = 'file-info';
+    const name = document.createElement('span');
+    name.className = 'file-name';
+    name.textContent = file.name;
+    const meta = document.createElement('span');
+    meta.className = 'file-meta';
+    meta.textContent = formatBytes(file.size);
+    info.append(name, meta);
+    const remove = document.createElement('button');
+    remove.className = 'remove-file';
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `ลบไฟล์ ${file.name}`);
+    remove.title = 'ลบไฟล์';
+    remove.textContent = '×';
+    remove.addEventListener('click', () => {
+      selectedFiles.splice(index, 1);
+      resetResults();
+      updateFileView();
+      setStatus('');
+    });
+    row.append(icon, info, remove);
+    fileList.append(row);
+  });
+  fileCount.textContent = `${selectedFiles.length} ไฟล์`;
+  convertButton.disabled = selectedFiles.length === 0;
+  clearButton.disabled = selectedFiles.length === 0;
+  updateWorkflow(selectedFiles.length ? 2 : 1);
+}
+
+function addFiles(files) {
+  const additions = [];
+  for (const file of files) {
+    if (!file.name.toLowerCase().endsWith('.docx')) { setStatus(`ข้าม ${file.name}: รองรับเฉพาะ DOCX`, true); continue; }
+    if (file.size > MAX_FILE_SIZE) { setStatus(`ข้าม ${file.name}: ไฟล์มีขนาดเกิน 20 MB`, true); continue; }
+    if (selectedFiles.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) continue;
+    additions.push(file);
+  }
+  selectedFiles.push(...additions);
+  if (additions.length) resetResults();
+  updateFileView();
+  if (additions.length) setStatus(`${additions.length} ไฟล์พร้อมแปลง`);
+}
+
+function renderResults(results) {
+  resultCards.replaceChildren();
+  for (const result of results) {
+    const card = document.createElement('article');
+    card.className = 'result-card';
+    const head = document.createElement('div');
+    head.className = 'result-card-head';
+    const title = document.createElement('div');
+    title.className = 'result-title';
+    const filename = document.createElement('strong');
+    filename.textContent = result.file.name;
+    const subtitle = document.createElement('span');
+    subtitle.textContent = `${result.data.paragraphCount} ย่อหน้า · ${result.data.outputs.map(item => item.locale === 'TH' ? 'ภาษาไทย' : 'English').join(' / ')}`;
+    title.append(filename, subtitle);
+    head.append(title);
+    const body = document.createElement('div');
+    body.className = 'result-body';
+    for (const output of result.data.outputs) {
+      const section = document.createElement('section');
+      section.className = 'language-output';
+      const sectionHead = document.createElement('div');
+      sectionHead.className = 'language-output-head';
+      const label = document.createElement('div');
+      label.className = 'language-label';
+      const languageName = output.locale === 'TH' ? 'ภาษาไทย' : 'English';
+      label.append(languageName);
+      const tag = document.createElement('span');
+      tag.className = 'language-tag';
+      tag.textContent = output.locale;
+      label.append(tag);
+      const tools = document.createElement('div');
+      tools.className = 'output-actions';
+      const copy = document.createElement('button');
+      copy.className = 'mini-button';
+      copy.type = 'button';
+      copy.textContent = 'คัดลอก HTML';
+      const download = document.createElement('button');
+      download.className = 'mini-button';
+      download.type = 'button';
+      download.textContent = 'ดาวน์โหลด';
+      const textarea = document.createElement('textarea');
+      textarea.className = 'code-output';
+      textarea.readOnly = true;
+      textarea.spellcheck = false;
+      textarea.setAttribute('aria-label', `HTML ${languageName} สำหรับ ${result.file.name}`);
+      textarea.value = output.html;
+      copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(textarea.value); copy.textContent = 'คัดลอกแล้ว'; }
+        catch { textarea.focus(); textarea.select(); document.execCommand('copy'); copy.textContent = 'คัดลอกแล้ว'; }
+        window.setTimeout(() => { copy.textContent = 'คัดลอก HTML'; }, 1600);
+      });
+      download.addEventListener('click', () => {
+        const suffix = output.locale.toLowerCase();
+        downloadText(`${result.file.name.replace(/\.docx$/i, '')}-${suffix}.html`, textarea.value);
+      });
+      tools.append(copy, download);
+      sectionHead.append(label, tools);
+      section.append(sectionHead, textarea);
+      body.append(section);
+    }
+    if (result.data.skipped.length || result.data.ignoredMetadata) {
+      const notes = document.createElement('details');
+      notes.className = 'result-notes';
+      const summary = document.createElement('summary');
+      summary.textContent = 'รายละเอียดการแปลง';
+      const list = document.createElement('ul');
+      if (result.data.skipped.length) {
+        const item = document.createElement('li');
+        item.textContent = `ข้ามพาดหัว ${result.data.skipped.length} บรรทัดตามตัวเลือก: ${result.data.skipped.join(' · ')}`;
+        list.append(item);
+      }
+      if (result.data.ignoredMetadata) {
+        const item = document.createElement('li');
+        item.textContent = 'พบตารางแบบฟอร์มข่าว: แปลงเฉพาะส่วน “เนื้อข่าว” และละช่องกำกับงาน เช่น หัวข้อข่าว ภาพข่าว และผู้ประสานงาน';
+        list.append(item);
+      }
+      notes.append(summary, list);
+      body.append(notes);
+    }
+    card.append(head, body);
+    resultCards.append(card);
+  }
+  resultSection.hidden = false;
+  updateWorkflow(3);
+}
+
+function downloadText(filename, value) {
+  const blob = new Blob([value], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+fileInput.addEventListener('change', event => {
+  addFiles(event.target.files || []);
+  fileInput.value = '';
+});
+
+for (const eventName of ['dragenter', 'dragover']) {
+  dropzone.addEventListener(eventName, event => { event.preventDefault(); dropzone.classList.add('dragging'); });
+}
+for (const eventName of ['dragleave', 'drop']) {
+  dropzone.addEventListener(eventName, event => { event.preventDefault(); dropzone.classList.remove('dragging'); });
+}
+dropzone.addEventListener('drop', event => addFiles(event.dataTransfer?.files || []));
+dropzone.addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fileInput.click(); }
+});
+
+convertButton.addEventListener('click', async () => {
+  if (!selectedFiles.length) return;
+  convertButton.disabled = true;
+  setStatus('กำลังอ่านไฟล์ในเบราว์เซอร์…');
+  const completed = [];
+  const failures = [];
+  for (let index = 0; index < selectedFiles.length; index++) {
+    const file = selectedFiles[index];
+    setStatus(`กำลังอ่าน ${index + 1}/${selectedFiles.length}: ${file.name}`);
+    try {
+      const data = await readDocument(file, headlineControl.checked);
+      completed.push({ file, data });
+    } catch (error) {
+      failures.push(`${file.name}: ${error.message || 'อ่านไฟล์ไม่สำเร็จ'}`);
+    }
+  }
+  convertButton.disabled = selectedFiles.length === 0;
+  if (completed.length) renderResults(completed);
+  if (failures.length) {
+    setStatus(`${completed.length} ไฟล์แปลงแล้ว · ${failures.join(' | ')}`, true);
+  } else if (completed.length) {
+    setStatus(`แปลงเสร็จ ${completed.length} ไฟล์ · ตรวจผลลัพธ์ก่อนนำไปใช้`);
+  } else {
+    setStatus(failures.join(' | ') || 'ไม่พบข้อความข่าวในไฟล์', true);
+    resultSection.hidden = true;
+  }
+});
+
+clearButton.addEventListener('click', () => {
+  selectedFiles = [];
+  updateFileView();
+  resetResults();
+  setStatus('ล้างไฟล์และผลลัพธ์แล้ว');
+});
