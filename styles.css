@@ -122,6 +122,14 @@ a { color: inherit; }
 .output-actions { display: flex; gap: 6px; }
 .mini-button { min-height: 26px; padding: 4px 8px; border: 1px solid #dfe7e1; border-radius: 6px; color: #52635b; background: #fff; cursor: pointer; font-size: 9px; font-weight: 650; }
 .mini-button:hover { color: var(--green-dark); border-color: #b7d0c0; background: #f7fbf8; }
+.preview-label, .code-label { padding: 8px 12px 5px; color: #7c8982; font-size: 9px; font-weight: 700; letter-spacing: .04em; }
+.output-preview { padding: 13px 16px 16px; border-bottom: 1px solid #edf0ed; color: #34443e; background: #fff; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.output-preview p { margin: 0 0 10px; }
+.output-preview p:last-child { margin-bottom: 0; }
+.output-preview strong { color: #1d3029; font-weight: 750; }
+.output-preview a { color: #176b59; text-decoration: underline; text-underline-offset: 2px; }
+.output-preview ul, .output-preview ol { margin: 0 0 10px; padding-left: 24px; }
+.output-preview figure { min-height: 52px; margin: 0 0 12px; padding: 9px; display: grid; place-items: center; border: 1px dashed #cbd8cf; border-radius: 7px; color: #809087; background: #fafcfb; font-size: 10px; }
 .code-output { display: block; width: 100%; min-height: 180px; padding: 13px; border: 0; outline: 0; resize: vertical; color: #263a34; background: white; font: 10px/1.55 "Cascadia Code", Consolas, monospace; tab-size: 2; white-space: pre; }
 .result-notes { padding: 9px 12px; border-top: 1px solid #edf0ed; color: #77837d; background: #fbfcfb; font-size: 9px; }
 .result-notes summary { color: #617169; cursor: pointer; font-weight: 650; }

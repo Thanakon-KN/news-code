@@ -14,6 +14,7 @@ Add one or more `.docx` files, choose whether to skip detected headlines, and se
 
 - Paragraph boundaries and hard line breaks
 - Bold, italic, and underline formatting
+- A rendered preview alongside the raw HTML code
 - Basic numbered and bulleted lists
 - External hyperlinks, with `target="_blank"`
 - News text stored in a labeled `เนื้อข่าว` or `Body` table cell

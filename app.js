@@ -117,15 +117,28 @@ function parseRelationships(xmlSource) {
 }
 
 function parseStyles(xmlSource) {
-  if (!xmlSource) return new Map();
+  if (!xmlSource) return { byId: new Map(), docDefaults: {}, defaultParagraph: {}, defaultCharacter: {} };
   const xml = xmlDocument(xmlSource, 'styles');
   const styles = new Map();
   for (const style of Array.from(xml.getElementsByTagNameNS(WORD_NS, 'style'))) {
     const id = style.getAttributeNS(WORD_NS, 'styleId') || style.getAttribute('w:styleId');
     const name = firstChild(style, 'name');
-    if (id) styles.set(id, name?.getAttributeNS(WORD_NS, 'val') || name?.getAttribute('w:val') || id);
+    if (id) styles.set(id, {
+      name: name?.getAttributeNS(WORD_NS, 'val') || name?.getAttribute('w:val') || id,
+      type: style.getAttributeNS(WORD_NS, 'type') || style.getAttribute('w:type') || '',
+      basedOn: wordValue(firstChild(style, 'basedOn')),
+      formatting: formatProperties(firstChild(style, 'rPr')),
+      isDefault: ['1', 'true', 'on'].includes((style.getAttributeNS(WORD_NS, 'default') || style.getAttribute('w:default') || '').toLowerCase())
+    });
   }
-  return styles;
+  const defaults = xml.getElementsByTagNameNS(WORD_NS, 'docDefaults')[0];
+  const defaultRun = firstChild(firstChild(defaults, 'rPrDefault'), 'rPr');
+  const styleContext = { byId: styles };
+  const defaultParagraphId = Array.from(styles.entries()).find(([, style]) => style.isDefault && style.type === 'paragraph')?.[0];
+  const defaultCharacterId = Array.from(styles.entries()).find(([, style]) => style.isDefault && style.type === 'character')?.[0];
+  const defaultParagraph = resolveStyleFormatting(defaultParagraphId, styleContext);
+  const defaultCharacter = resolveStyleFormatting(defaultCharacterId, styleContext);
+  return { byId: styles, docDefaults: formatProperties(defaultRun), defaultParagraph, defaultCharacter };
 }
 
 function parseNumbering(xmlSource) {
@@ -185,17 +198,48 @@ function autoLinkText(value) {
   return output;
 }
 
-function runFormatting(run) {
-  const properties = firstChild(run, 'rPr');
-  const hasOn = name => {
+function propertyState(properties, names) {
+  for (const name of names) {
     const element = firstChild(properties, name);
-    if (!element) return false;
+    if (!element) continue;
     const value = wordValue(element).toLowerCase();
-    return value !== '0' && value !== 'false' && value !== 'off' && value !== 'none';
+    return !['0', 'false', 'off', 'none'].includes(value);
+  }
+  return undefined;
+}
+
+function formatProperties(properties) {
+  if (!properties) return {};
+  const formatting = {};
+  const bold = propertyState(properties, ['b', 'bCs']);
+  const italic = propertyState(properties, ['i', 'iCs']);
+  const underline = propertyState(properties, ['u']);
+  if (bold !== undefined) formatting.bold = bold;
+  if (italic !== undefined) formatting.italic = italic;
+  if (underline !== undefined) formatting.underline = underline;
+  return formatting;
+}
+
+function resolveStyleFormatting(styleId, styles, visited = new Set()) {
+  if (!styleId || visited.has(styleId)) return {};
+  visited.add(styleId);
+  const style = styles.byId.get(styleId);
+  if (!style) return {};
+  return { ...resolveStyleFormatting(style.basedOn, styles, visited), ...style.formatting };
+}
+
+function runFormatting(run, context, paragraphStyleId) {
+  const properties = firstChild(run, 'rPr');
+  const characterStyleId = wordValue(firstChild(properties, 'rStyle'));
+  const effective = {
+    ...context.styles.docDefaults,
+    ...context.styles.defaultParagraph,
+    ...context.styles.defaultCharacter,
+    ...resolveStyleFormatting(paragraphStyleId, context.styles),
+    ...resolveStyleFormatting(characterStyleId, context.styles),
+    ...formatProperties(properties)
   };
-  const underlineElement = firstChild(properties, 'u');
-  const underline = underlineElement && wordValue(underlineElement).toLowerCase() !== 'none';
-  return { bold: hasOn('b') || hasOn('bCs'), italic: hasOn('i') || hasOn('iCs'), underline };
+  return { bold: effective.bold === true, italic: effective.italic === true, underline: effective.underline === true };
 }
 
 function wrapFormatting(html, format) {
@@ -212,7 +256,7 @@ function safeHref(target) {
   return '';
 }
 
-function renderInline(node, relationships) {
+function renderInline(node, relationships, context, paragraphStyleId) {
   if (node.nodeType !== 1) return '';
   switch (node.localName) {
     case 'pPr': case 'rPr': return '';
@@ -222,26 +266,26 @@ function renderInline(node, relationships) {
     case 'noBreakHyphen': return '&#8209;';
     case 'softHyphen': return '&shy;';
     case 'r': {
-      const inner = Array.from(node.children).map(child => renderInline(child, relationships)).join('');
-      return wrapFormatting(inner, runFormatting(node));
+      const inner = Array.from(node.children).map(child => renderInline(child, relationships, context, paragraphStyleId)).join('');
+      return wrapFormatting(inner, runFormatting(node, context, paragraphStyleId));
     }
     case 'hyperlink': {
       const id = node.getAttributeNS(REL_NS, 'id') || node.getAttribute('r:id') || '';
       const relationship = relationships.get(id);
-      const inner = Array.from(node.children).map(child => renderInline(child, relationships)).join('');
+      const inner = Array.from(node.children).map(child => renderInline(child, relationships, context, paragraphStyleId)).join('');
       const href = relationship?.external ? safeHref(relationship.target) : '';
       return href ? `<a href="${escapeHtml(href)}" target="_blank">${inner}</a>` : inner;
     }
-    default: return Array.from(node.children || []).map(child => renderInline(child, relationships)).join('');
+    default: return Array.from(node.children || []).map(child => renderInline(child, relationships, context, paragraphStyleId)).join('');
   }
 }
 
-function countStyles(node) {
+function countStyles(node, context, paragraphStyleId) {
   const runs = descendants(node, 'r').filter(run => xmlTextOf(run).trim());
   let bold = 0;
   let maxSize = 0;
   for (const run of runs) {
-    const format = runFormatting(run);
+    const format = runFormatting(run, context, paragraphStyleId);
     if (format.bold) bold++;
     const size = firstChild(firstChild(run, 'rPr'), 'sz');
     maxSize = Math.max(maxSize, Number(wordValue(size)) || 0);
@@ -267,10 +311,10 @@ function paragraphNode(paragraph, context) {
   const text = xmlTextOf(paragraph);
   const paragraphProps = firstChild(paragraph, 'pPr');
   const styleId = wordValue(firstChild(paragraphProps, 'pStyle'));
-  const styleName = context.styles.get(styleId) || styleId;
+  const styleName = context.styles.byId.get(styleId)?.name || styleId;
   const alignment = wordValue(firstChild(paragraphProps, 'jc'));
-  const runs = countStyles(paragraph);
-  const body = Array.from(paragraph.children).map(child => renderInline(child, context.relationships)).join('');
+  const runs = countStyles(paragraph, context, styleId);
+  const body = Array.from(paragraph.children).map(child => renderInline(child, context.relationships, context, styleId)).join('');
   const size = runs.maxSize;
   const isHeadingStyle = /^(title|subtitle|heading\s*[1-3])$/i.test(styleName || '');
   const hasHeadlineLabel = /^\s*headline\s*:/i.test(text);
@@ -523,6 +567,21 @@ function renderResults(results) {
       textarea.spellcheck = false;
       textarea.setAttribute('aria-label', `HTML ${languageName} สำหรับ ${result.file.name}`);
       textarea.value = output.html;
+      const previewLabel = document.createElement('div');
+      previewLabel.className = 'preview-label';
+      previewLabel.textContent = 'ตัวอย่างการแสดงผล';
+      const preview = document.createElement('div');
+      preview.className = 'output-preview';
+      preview.setAttribute('aria-label', `ตัวอย่างเนื้อหา ${languageName} สำหรับ ${result.file.name}`);
+      preview.innerHTML = output.html;
+      for (const image of preview.querySelectorAll('figure img[src="xxx"]')) {
+        const placeholder = document.createElement('span');
+        placeholder.textContent = 'พื้นที่สำหรับรูปภาพข่าว';
+        image.replaceWith(placeholder);
+      }
+      const codeLabel = document.createElement('div');
+      codeLabel.className = 'code-label';
+      codeLabel.textContent = 'HTML';
       copy.addEventListener('click', async () => {
         try { await navigator.clipboard.writeText(textarea.value); copy.textContent = 'คัดลอกแล้ว'; }
         catch { textarea.focus(); textarea.select(); document.execCommand('copy'); copy.textContent = 'คัดลอกแล้ว'; }
@@ -534,7 +593,7 @@ function renderResults(results) {
       });
       tools.append(copy, download);
       sectionHead.append(label, tools);
-      section.append(sectionHead, textarea);
+      section.append(sectionHead, previewLabel, preview, codeLabel, textarea);
       body.append(section);
     }
     if (result.data.skipped.length || result.data.ignoredMetadata) {
