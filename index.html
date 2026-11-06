@@ -8,7 +8,7 @@
   <title>News Code · แปลงข่าวเป็น HTML</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body id="top">
+<body id="top" class="workspace-app">
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="#top" aria-label="News Code">
@@ -21,9 +21,11 @@
 
   <main class="shell">
     <section class="intro">
-      <p class="eyebrow">NEWS CODE · WORD TO CMS</p>
-      <h1>เปลี่ยนไฟล์ข่าวเป็นโค้ด พร้อมลง CMS</h1>
-      <p class="intro-copy">แยกภาษาไทยและอังกฤษ คงถ้อยคำและรูปแบบจากต้นฉบับ พร้อมคัดลอกหรือดาวน์โหลด HTML</p>
+      <div class="intro-copyblock">
+        <p class="eyebrow">NEWS CODE · WORD TO CMS</p>
+        <h1>เปลี่ยนไฟล์ข่าวเป็นโค้ด พร้อมลง CMS</h1>
+        <p class="intro-copy">แยกภาษาไทยและอังกฤษ พร้อมคงถ้อยคำและรูปแบบจากต้นฉบับ</p>
+      </div>
       <div class="workflow" aria-label="ขั้นตอน">
         <span class="workflow-step active" data-step="1" aria-current="step"><b>01</b> เพิ่มไฟล์ข่าว</span>
         <span class="workflow-rule"></span>
@@ -59,11 +61,6 @@
             </label>
           </div>
 
-          <div class="privacy-note">
-            <span class="note-icon" aria-hidden="true">i</span>
-            <p><strong>ไฟล์อยู่บนเครื่องคุณ</strong><br>ระบบอ่านไฟล์ในเบราว์เซอร์และไม่อัปโหลดเนื้อหาไปยังเซิร์ฟเวอร์</p>
-          </div>
-
           <div class="actions">
             <button class="button primary" id="convert" type="button" disabled>สร้าง HTML <span aria-hidden="true">→</span></button>
             <button class="button secondary" id="clear" type="button" disabled>เริ่มใหม่</button>
@@ -72,32 +69,40 @@
         </div>
       </article>
 
-      <aside class="guide-card">
-        <div class="guide-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M7 3.75h7l4 4v12.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 4v4h4M8 12h8M8 15h8M8 18h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        </div>
-        <p class="section-kicker">STEP 02 · CONVERSION</p>
-        <h2>ตรวจแล้วค่อยนำไปใช้</h2>
-        <ul class="rule-list">
-          <li><span>1</span> เพิ่ม DOCX หนึ่งไฟล์หรือหลายไฟล์</li>
-          <li><span>2</span> เลือกว่าจะข้ามพาดหัวหรือไม่</li>
-          <li><span>3</span> ตรวจโค้ดแยกตามภาษา</li>
-          <li><span>4</span> คัดลอกหรือดาวน์โหลดไปใช้ใน CMS</li>
-        </ul>
-        <p class="guide-foot">ไม่เรียบเรียงหรือแก้ไขถ้อยคำ · ประมวลผลในเบราว์เซอร์</p>
-      </aside>
-    </section>
+      <div class="output-workspace" id="output-workspace">
+        <aside class="guide-card" id="empty-output">
+          <div class="output-heading">
+            <div class="guide-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M7 3.75h7l4 4v12.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1-2-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 4v4h4M8 12h8M8 15h8M8 18h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div><p class="section-kicker">FORMAT · PRESERVED</p><h2>คงรูปแบบจากต้นฉบับ</h2></div>
+          </div>
+          <div class="format-grid">
+            <div class="format-item"><span>✓</span><strong>ตัวหนา · ตัวเอียง · ขีดเส้นใต้</strong></div>
+            <div class="format-item"><span>✓</span><strong>ย่อหน้าและรายการ</strong></div>
+            <div class="format-item"><span>✓</span><strong>แยกภาษาไทยและอังกฤษ</strong></div>
+            <div class="format-item"><span>✓</span><strong>ลิงก์เปิดในแท็บใหม่</strong></div>
+          </div>
+          <div class="empty-preview">
+            <div class="empty-preview-mark" aria-hidden="true">&lt;/&gt;</div>
+            <strong>ผลลัพธ์จะแสดงตรงนี้</strong>
+            <span>เพิ่มไฟล์ข่าว แล้วกด “สร้าง HTML”</span>
+          </div>
+          <p class="privacy-note"><span class="privacy-dot"></span> ไฟล์ประมวลผลในเบราว์เซอร์ ไม่อัปโหลดขึ้นเซิร์ฟเวอร์</p>
+        </aside>
 
-    <section class="results" id="results" hidden>
-      <div class="results-heading">
-        <div><p class="section-kicker">STEP 03 · READY TO PUBLISH</p><h2>โค้ดพร้อมใช้งาน</h2></div>
-        <p class="results-hint">ตรวจข้อความและรูปแบบอีกครั้งก่อนคัดลอกไปวางใน CMS</p>
+        <section class="results" id="results" aria-label="ผลลัพธ์ HTML" hidden>
+          <div class="results-heading">
+            <div><p class="section-kicker">STEP 03 · READY TO PUBLISH</p><h2>ตัวอย่างและโค้ด HTML</h2></div>
+            <p class="results-hint">คัดลอกหรือดาวน์โหลดแยกตามภาษา</p>
+          </div>
+          <div class="result-cards" id="result-cards"></div>
+        </section>
       </div>
-      <div class="result-cards" id="result-cards"></div>
     </section>
 
     <footer class="footer">
-      <span>News Code · DOCX to CMS HTML</span>
+      <span>News Code · ไฟล์อยู่บนเครื่องคุณ</span>
       <a href="https://github.com/Thanakon-KN/news-code" target="_blank" rel="noopener noreferrer">GitHub repository <span aria-hidden="true">↗</span></a>
     </footer>
   </main>

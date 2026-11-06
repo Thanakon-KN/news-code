@@ -199,3 +199,125 @@ a { color: inherit; }
   .footer { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+
+/* Option 1: one-screen workspace */
+.workspace-app { height: 100vh; height: 100dvh; overflow: hidden; background: #f2f4f9; }
+.workspace-app .topbar { height: 58px; }
+.workspace-app .topbar-inner { max-width: 1600px; padding-right: 28px; padding-left: 28px; }
+.workspace-app .brand-mark { width: 34px; height: 34px; border-radius: 10px; }
+.workspace-app .shell { width: min(1600px, 100%); height: calc(100vh - 58px); height: calc(100dvh - 58px); max-width: none; margin: 0 auto; padding: 14px 24px 10px; display: grid; grid-template-rows: 82px minmax(0, 1fr) 24px; gap: 12px; }
+.workspace-app .intro { min-width: 0; margin: 0; padding: 12px 22px; border-radius: 15px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.workspace-app .intro-copyblock { min-width: 0; }
+.workspace-app .intro .eyebrow { font-size: 9px; }
+.workspace-app .intro h1 { margin: 3px 0 2px; font-size: 21px; line-height: 1.25; letter-spacing: -.035em; }
+.workspace-app .intro-copy { font-size: 11px; }
+.workspace-app .workflow { flex: 0 0 auto; margin: 0; }
+.workspace-app .workflow-step { gap: 7px; font-size: 10px; }
+.workspace-app .workflow-step b { width: 25px; height: 25px; font-size: 9px; }
+.workspace-app .workflow-rule { width: 28px; margin: 0 10px; }
+.workspace-app .workspace { min-height: 0; margin: 0; grid-template-columns: minmax(310px, .78fr) minmax(0, 1.55fr); align-items: stretch; gap: 14px; }
+.workspace-app .upload-panel { min-height: 0; display: flex; flex-direction: column; border-radius: 15px; }
+.workspace-app .panel-heading { min-height: 68px; padding: 12px 18px; }
+.workspace-app .panel-heading h2 { margin-top: 2px; font-size: 18px; }
+.workspace-app .panel-content { min-height: 0; padding: 15px 18px; display: flex; flex-direction: column; }
+.workspace-app .dropzone { min-height: clamp(125px, 21vh, 190px); padding: 14px; border-radius: 12px; }
+.workspace-app .upload-icon { width: 43px; height: 43px; margin-bottom: 9px; border-radius: 13px; }
+.workspace-app .upload-icon svg { width: 22px; height: 22px; }
+.workspace-app .drop-title { font-size: 14px; }
+.workspace-app .drop-subtitle { font-size: 10px; }
+.workspace-app .file-list { max-height: 18vh; overflow-y: auto; }
+.workspace-app .file-row { min-height: 52px; }
+.workspace-app .options { margin-top: 12px; padding: 11px 12px; }
+.workspace-app .check-row strong { font-size: 12px; }
+.workspace-app .check-row small { font-size: 10px; }
+.workspace-app .actions { margin-top: auto; padding-top: 14px; flex-wrap: wrap; }
+.workspace-app .button { min-height: 40px; }
+.workspace-app .status { flex-basis: 100%; }
+.workspace-app .output-workspace { min-width: 0; min-height: 0; display: grid; }
+.workspace-app .guide-card, .workspace-app .results { min-width: 0; min-height: 0; margin: 0; border: 1px solid var(--line); border-radius: 15px; background: #fff; box-shadow: var(--shadow); }
+.workspace-app .guide-card { position: static; padding: 20px; display: flex; flex-direction: column; }
+.workspace-app .output-heading { display: flex; align-items: center; gap: 13px; }
+.workspace-app .guide-icon { width: 40px; height: 40px; margin: 0; }
+.workspace-app .guide-card h2 { margin: 2px 0 0; font-size: 17px; }
+.workspace-app .guide-card .section-kicker { font-size: 9px; }
+.workspace-app .format-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.workspace-app .format-item { min-height: 46px; padding: 9px 11px; display: flex; align-items: center; gap: 8px; border: 1px solid #e8ecf3; border-radius: 10px; color: #46546f; background: #fafbfe; font-size: 11px; }
+.workspace-app .format-item span { width: 19px; height: 19px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; color: #278464; background: #e8f6ef; font-size: 11px; font-weight: 800; }
+.workspace-app .format-item strong { font-size: 11px; font-weight: 650; }
+.workspace-app .empty-preview { flex: 1; min-height: 150px; margin-top: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed #cbd4e4; border-radius: 12px; color: #6b7890; background: #fafbfe; text-align: center; }
+.workspace-app .empty-preview-mark { margin-bottom: 10px; padding: 9px 12px; border-radius: 9px; color: #5068cf; background: #edf0ff; font: 700 14px/1 "Cascadia Code", Consolas, monospace; }
+.workspace-app .empty-preview strong { color: #34425d; font-size: 13px; }
+.workspace-app .empty-preview span { margin-top: 4px; font-size: 11px; }
+.workspace-app .privacy-note { margin: 12px 0 0; display: flex; align-items: center; gap: 9px; color: #617c70; font-size: 10px; }
+.workspace-app .privacy-note .privacy-dot { width: 7px; height: 7px; flex: 0 0 auto; box-shadow: none; }
+.workspace-app .output-workspace.has-results .guide-card { display: none; }
+.workspace-app .results:not([hidden]) { display: flex; flex-direction: column; overflow: hidden; padding: 14px; }
+.workspace-app .results-heading { flex: 0 0 auto; margin: 0 0 10px; align-items: center; }
+.workspace-app .results-heading .section-kicker { font-size: 9px; }
+.workspace-app .results-heading h2 { margin-top: 2px; font-size: 18px; }
+.workspace-app .results-hint { font-size: 10px; }
+.workspace-app .result-cards { min-height: 0; overflow-y: auto; align-content: start; gap: 10px; padding-right: 3px; }
+.workspace-app .result-card { border-radius: 11px; box-shadow: none; }
+.workspace-app .result-card-head { min-height: 47px; padding: 8px 12px; }
+.workspace-app .result-title strong { font-size: 11px; }
+.workspace-app .result-title span { margin-top: 1px; font-size: 9px; }
+.workspace-app .result-body { padding: 9px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; gap: 9px; }
+.workspace-app .language-output { min-width: 0; border-radius: 9px; }
+.workspace-app .language-output-head { min-height: 39px; padding: 6px 8px; }
+.workspace-app .language-label { font-size: 10px; }
+.workspace-app .language-tag { padding: 2px 6px; font-size: 8px; }
+.workspace-app .output-actions { gap: 5px; }
+.workspace-app .mini-button { min-height: 27px; padding: 4px 7px; font-size: 9px; }
+.workspace-app .output-content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.workspace-app .output-column { min-width: 0; }
+.workspace-app .preview-column { border-right: 1px solid #edf0f5; }
+.workspace-app .preview-label, .workspace-app .code-label { padding: 7px 9px 4px; font-size: 8px; }
+.workspace-app .output-preview { height: clamp(130px, 25vh, 230px); overflow: auto; padding: 8px 9px; font-size: 10px; line-height: 1.65; }
+.workspace-app .output-preview p { margin-bottom: 7px; }
+.workspace-app .output-preview figure { min-height: 36px; margin-bottom: 8px; padding: 6px; font-size: 9px; }
+.workspace-app .code-output { min-height: 0; height: clamp(130px, 25vh, 230px); resize: vertical; padding: 8px 9px; font-size: 9px; }
+.workspace-app .result-notes { padding: 7px 10px; font-size: 9px; }
+.workspace-app .footer { min-width: 0; margin: 0; padding: 2px 3px 0; align-items: center; border: 0; font-size: 9px; }
+
+@media (min-width: 721px) and (max-height: 760px) {
+  .workspace-app .shell { grid-template-rows: 70px minmax(0, 1fr) 20px; gap: 8px; padding-top: 9px; padding-bottom: 7px; }
+  .workspace-app .intro { padding-top: 8px; padding-bottom: 8px; }
+  .workspace-app .dropzone { min-height: 112px; }
+  .workspace-app .format-grid { gap: 7px; margin-top: 12px; }
+  .workspace-app .empty-preview { min-height: 110px; margin-top: 11px; }
+  .workspace-app .results:not([hidden]) { padding: 10px; }
+  .workspace-app .output-preview, .workspace-app .code-output { height: 20vh; }
+}
+
+@media (max-width: 900px) and (min-height: 650px) {
+  .workspace-app .shell { padding-right: 15px; padding-left: 15px; }
+  .workspace-app .workspace { grid-template-columns: minmax(260px, .78fr) minmax(0, 1.35fr); gap: 10px; }
+  .workspace-app .workflow-rule { width: 14px; margin: 0 6px; }
+  .workspace-app .workflow-step { gap: 5px; font-size: 9px; }
+  .workspace-app .workflow-step b { width: 22px; height: 22px; }
+  .workspace-app .format-grid { grid-template-columns: 1fr; gap: 6px; margin-top: 12px; }
+  .workspace-app .format-item { min-height: 36px; }
+  .workspace-app .result-body { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px), (max-height: 600px) {
+  .workspace-app { height: auto; min-height: 100vh; min-height: 100dvh; overflow: auto; }
+  .workspace-app .topbar { height: 58px; }
+  .workspace-app .shell { height: auto; min-height: calc(100vh - 58px); min-height: calc(100dvh - 58px); padding: 12px 14px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .workspace-app .intro { min-height: 0; padding: 17px; align-items: flex-start; flex-direction: column; gap: 12px; }
+  .workspace-app .intro h1 { font-size: 20px; }
+  .workspace-app .workflow { width: 100%; justify-content: space-between; gap: 4px; }
+  .workspace-app .workflow-step { font-size: 9px; }
+  .workspace-app .workflow-rule { flex: 1 1 10px; width: auto; margin: 0 3px; }
+  .workspace-app .workspace { display: flex; flex-direction: column; gap: 12px; }
+  .workspace-app .panel-content { padding: 13px; }
+  .workspace-app .dropzone { min-height: 145px; }
+  .workspace-app .actions { margin-top: 12px; }
+  .workspace-app .output-workspace { min-height: 400px; }
+  .workspace-app .guide-card { min-height: 390px; padding: 15px; }
+  .workspace-app .format-grid { grid-template-columns: 1fr 1fr; }
+  .workspace-app .format-item { font-size: 10px; }
+  .workspace-app .output-preview { height: 180px; }
+  .workspace-app .code-output { height: 180px; }
+  .workspace-app .footer { align-items: flex-start; }
+}

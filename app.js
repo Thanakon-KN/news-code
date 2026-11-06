@@ -13,6 +13,7 @@ const clearButton = document.querySelector('#clear');
 const statusNode = document.querySelector('#status');
 const resultSection = document.querySelector('#results');
 const resultCards = document.querySelector('#result-cards');
+const outputWorkspace = document.querySelector('#output-workspace');
 const headlineControl = document.querySelector('#skip-headline');
 const workflowSteps = Array.from(document.querySelectorAll('.workflow-step'));
 const workflowRules = Array.from(document.querySelectorAll('.workflow-rule'));
@@ -469,6 +470,7 @@ function updateWorkflow(stage) {
 function resetResults() {
   resultCards.replaceChildren();
   resultSection.hidden = true;
+  outputWorkspace.classList.remove('has-results');
 }
 
 function updateFileView() {
@@ -595,7 +597,16 @@ function renderResults(results) {
       });
       tools.append(copy, download);
       sectionHead.append(label, tools);
-      section.append(sectionHead, previewLabel, preview, codeLabel, textarea);
+      const previewColumn = document.createElement('div');
+      previewColumn.className = 'output-column preview-column';
+      previewColumn.append(previewLabel, preview);
+      const codeColumn = document.createElement('div');
+      codeColumn.className = 'output-column code-column';
+      codeColumn.append(codeLabel, textarea);
+      const content = document.createElement('div');
+      content.className = 'output-content';
+      content.append(previewColumn, codeColumn);
+      section.append(sectionHead, content);
       body.append(section);
     }
     if (result.data.skipped.length || result.data.ignoredMetadata) {
@@ -621,6 +632,7 @@ function renderResults(results) {
     resultCards.append(card);
   }
   resultSection.hidden = false;
+  outputWorkspace.classList.add('has-results');
   updateWorkflow(3);
 }
 
