@@ -252,6 +252,10 @@ function wrapFormatting(html, format) {
   return html;
 }
 
+function mergeAdjacentFormatting(html) {
+  return html.replace(/<\/(strong|em|u)><\1>/g, '');
+}
+
 function safeHref(target) {
   const value = String(target || '').trim();
   if (/^(https?:\/\/|mailto:|tel:)/i.test(value)) return value;
@@ -310,18 +314,19 @@ function listProperties(paragraph, numbering) {
   return { id: numId, level: Number(level), ordered, type: type || '', format: definition.format };
 }
 
-function paragraphNode(paragraph, context) {
+function paragraphNode(paragraph, context, isFirstContentParagraph = false) {
   const text = xmlTextOf(paragraph);
   const paragraphProps = firstChild(paragraph, 'pPr');
   const styleId = wordValue(firstChild(paragraphProps, 'pStyle'));
   const styleName = context.styles.byId.get(styleId)?.name || styleId;
   const alignment = wordValue(firstChild(paragraphProps, 'jc'));
   const runs = countStyles(paragraph, context, styleId);
-  const body = Array.from(paragraph.children).map(child => renderInline(child, context.relationships, context, styleId)).join('');
+  const body = mergeAdjacentFormatting(Array.from(paragraph.children).map(child => renderInline(child, context.relationships, context, styleId)).join(''));
   const size = runs.maxSize;
   const isHeadingStyle = /^(title|subtitle|heading\s*[1-3])$/i.test(styleName || '');
   const hasHeadlineLabel = /^\s*headline\s*:/i.test(text);
-  const candidate = hasHeadlineLabel || isHeadingStyle || (text.trim().length >= 24 && runs.runCount > 0 && runs.boldCount === runs.runCount && (alignment === 'center' || size >= 48));
+  const fullyBoldHeadline = text.trim().length >= 24 && runs.runCount > 0 && runs.boldCount === runs.runCount;
+  const candidate = hasHeadlineLabel || isHeadingStyle || (fullyBoldHeadline && (alignment === 'center' || size >= 48 || (isFirstContentParagraph && size >= 32)));
   return {
     kind: 'paragraph', text, html: `<p>${body}</p>`, locale: detectLocale(text),
     alignment, styleName, candidate, hasHeadlineLabel, list: listProperties(paragraph, context.numbering)
@@ -424,10 +429,14 @@ async function readDocument(file, skipHeadline) {
 
   const blocks = [];
   let ignoredMetadata = false;
+  let seenContentParagraph = false;
   for (const child of Array.from(body.children)) {
     if (child.localName === 'p') {
-      const paragraph = paragraphNode(child, context);
-      if (paragraph.text.trim()) blocks.push(paragraph);
+      const paragraph = paragraphNode(child, context, !seenContentParagraph);
+      if (paragraph.text.trim()) {
+        blocks.push(paragraph);
+        seenContentParagraph = true;
+      }
     } else if (child.localName === 'tbl') {
       const table = parseTable(child, context);
       if (table.kind === 'formBody') { blocks.push(...table.blocks); ignoredMetadata = true; }
