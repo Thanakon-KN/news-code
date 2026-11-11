@@ -99,6 +99,29 @@
           <div class="result-cards" id="result-cards"></div>
         </section>
       </div>
+
+      <aside class="publish-panel" aria-label="นำ HTML ไปใช้">
+        <div class="publish-heading">
+          <span class="publish-icon" aria-hidden="true">↗</span>
+          <div><p class="section-kicker">STEP 03 · PUBLISH</p><h2>นำ HTML ไปใช้</h2></div>
+        </div>
+        <div class="publish-empty" id="publish-empty">
+          <p>เพิ่มไฟล์และสร้าง HTML ก่อน</p>
+          <span>จากนั้นเลือกไฟล์กับภาษา แล้วคัดลอกหรือดาวน์โหลดได้จากตรงนี้</span>
+        </div>
+        <div class="publish-controls" id="publish-controls" hidden>
+          <label class="publish-label" for="publish-file">ไฟล์ข่าว</label>
+          <select id="publish-file" class="publish-select"></select>
+          <p class="publish-label">ภาษา</p>
+          <div class="publish-languages" id="publish-languages"></div>
+          <p class="publish-summary" id="publish-summary"></p>
+          <div class="publish-actions">
+            <button class="button primary" id="publish-copy" type="button">คัดลอก HTML</button>
+            <button class="button secondary" id="publish-download" type="button">ดาวน์โหลดไฟล์</button>
+          </div>
+          <p class="publish-foot">เนื้อหาคงตามต้นฉบับ · ประมวลผลบนเครื่อง</p>
+        </div>
+      </aside>
     </section>
 
     <footer class="footer">
@@ -106,6 +129,6 @@
       <a href="https://github.com/Thanakon-KN/news-code" target="_blank" rel="noopener noreferrer">GitHub repository <span aria-hidden="true">↗</span></a>
     </footer>
   </main>
-  <script src="app.js?v=20261111-2" defer></script>
+  <script src="app.js?v=20261111-3" defer></script>
 </body>
 </html>

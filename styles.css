@@ -321,3 +321,53 @@ a { color: inherit; }
   .workspace-app .code-output { height: 180px; }
   .workspace-app .footer { align-items: flex-start; }
 }
+
+/* Option 3: file queue + preview + publish actions */
+.workspace-app .workspace { grid-template-columns: minmax(245px, .78fr) minmax(0, 1.55fr) minmax(210px, .65fr); gap: 12px; }
+.workspace-app .upload-panel { border-radius: 14px; }
+.workspace-app .panel-heading { min-height: 60px; padding: 10px 14px; }
+.workspace-app .panel-content { padding: 12px 14px; }
+.workspace-app .dropzone { min-height: clamp(92px, 15vh, 132px); }
+.workspace-app .upload-icon { width: 36px; height: 36px; margin-bottom: 6px; }
+.workspace-app .file-list { max-height: 28vh; }
+.workspace-app .file-row { padding: 8px; gap: 8px; }
+.workspace-app .file-name { font-size: 10px; }
+.workspace-app .file-meta { font-size: 9px; }
+.workspace-app .options { margin-top: 9px; padding: 9px; }
+.workspace-app .actions { margin-top: 10px; padding-top: 9px; }
+.workspace-app .output-workspace { min-width: 0; }
+.workspace-app .publish-panel { min-width: 0; min-height: 0; padding: 17px 14px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 15px; background: #fff; box-shadow: var(--shadow); }
+.workspace-app .publish-heading { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid #e9edf4; }
+.workspace-app .publish-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: #4163e8; background: #eef2ff; font-size: 18px; font-weight: 800; }
+.workspace-app .publish-heading .section-kicker { color: #7787b3; font-size: 8px; }
+.workspace-app .publish-heading h2 { margin: 2px 0 0; font-size: 15px; }
+.workspace-app .publish-empty { margin: auto 0; padding: 15px 4px; text-align: center; }
+.workspace-app .publish-empty p { margin: 0; color: #46546f; font-size: 12px; font-weight: 750; }
+.workspace-app .publish-empty span { display: block; margin-top: 6px; color: #7b879b; font-size: 10px; line-height: 1.65; }
+.workspace-app .publish-controls { padding-top: 16px; }
+.workspace-app .publish-label { display: block; margin: 0 0 7px; color: #64718a; font-size: 10px; font-weight: 750; }
+.workspace-app .publish-select { width: 100%; min-height: 38px; padding: 7px 9px; border: 1px solid #dfe5ef; border-radius: 9px; color: #35435d; background: #fff; font: inherit; font-size: 10px; }
+.workspace-app .publish-controls > .publish-label:not(:first-child) { margin-top: 17px; }
+.workspace-app .publish-languages { display: flex; flex-wrap: wrap; gap: 7px; }
+.workspace-app .publish-language { min-height: 32px; padding: 6px 12px; border: 1px solid #e0e5ee; border-radius: 8px; color: #64718a; background: #fff; cursor: pointer; font-size: 10px; font-weight: 700; }
+.workspace-app .publish-language.active { border-color: #4163e8; color: #3454d0; background: #eef2ff; }
+.workspace-app .publish-summary { min-height: 40px; margin: 14px 0; padding: 10px; border-radius: 9px; color: #64718a; background: #f7f8fc; font-size: 10px; }
+.workspace-app .publish-actions { display: grid; gap: 8px; }
+.workspace-app .publish-actions .button { width: 100%; min-height: 38px; padding: 8px; font-size: 10px; }
+.workspace-app .publish-foot { margin: auto 0 0; padding-top: 15px; color: #8590a3; font-size: 9px; line-height: 1.55; }
+
+@media (max-width: 900px) and (min-height: 650px) {
+  .workspace-app .workspace { grid-template-columns: minmax(210px, .7fr) minmax(280px, 1.3fr) minmax(170px, .6fr); gap: 8px; }
+  .workspace-app .publish-panel { padding: 13px 10px; }
+  .workspace-app .publish-heading { gap: 7px; }
+  .workspace-app .publish-heading h2 { font-size: 13px; }
+  .workspace-app .publish-summary { padding: 8px; }
+  .workspace-app .result-body { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px), (max-height: 600px) {
+  .workspace-app .workspace { display: flex; flex-direction: column; }
+  .workspace-app .publish-panel { min-height: 310px; }
+  .workspace-app .publish-empty { margin: 18px 0; }
+  .workspace-app .publish-foot { margin-top: 24px; }
+}

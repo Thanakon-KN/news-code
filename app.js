@@ -14,11 +14,20 @@ const statusNode = document.querySelector('#status');
 const resultSection = document.querySelector('#results');
 const resultCards = document.querySelector('#result-cards');
 const outputWorkspace = document.querySelector('#output-workspace');
+const publishEmpty = document.querySelector('#publish-empty');
+const publishControls = document.querySelector('#publish-controls');
+const publishFileSelect = document.querySelector('#publish-file');
+const publishLanguages = document.querySelector('#publish-languages');
+const publishSummary = document.querySelector('#publish-summary');
+const publishCopyButton = document.querySelector('#publish-copy');
+const publishDownloadButton = document.querySelector('#publish-download');
 const headlineControl = document.querySelector('#skip-headline');
 const workflowSteps = Array.from(document.querySelectorAll('.workflow-step'));
 const workflowRules = Array.from(document.querySelectorAll('.workflow-rule'));
 
 let selectedFiles = [];
+let completedResults = [];
+let publishLocale = '';
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, character => ({
@@ -480,6 +489,12 @@ function resetResults() {
   resultCards.replaceChildren();
   resultSection.hidden = true;
   outputWorkspace.classList.remove('has-results');
+  completedResults = [];
+  publishLocale = '';
+  publishFileSelect.replaceChildren();
+  publishLanguages.replaceChildren();
+  publishEmpty.hidden = false;
+  publishControls.hidden = true;
 }
 
 function updateFileView() {
@@ -536,7 +551,13 @@ function addFiles(files) {
 
 function renderResults(results) {
   resultCards.replaceChildren();
+  completedResults = results;
+  publishFileSelect.replaceChildren();
   for (const result of results) {
+    const option = document.createElement('option');
+    option.value = String(publishFileSelect.options.length);
+    option.textContent = result.file.name;
+    publishFileSelect.append(option);
     const card = document.createElement('article');
     card.className = 'result-card';
     const head = document.createElement('div');
@@ -642,8 +663,67 @@ function renderResults(results) {
   }
   resultSection.hidden = false;
   outputWorkspace.classList.add('has-results');
+  publishLocale = results[0]?.data.outputs[0]?.locale || '';
+  publishEmpty.hidden = results.length > 0;
+  publishControls.hidden = results.length === 0;
+  updatePublishPanel();
   updateWorkflow(3);
 }
+
+function getPublishOutput() {
+  const result = completedResults[Number(publishFileSelect.value)];
+  const output = result?.data.outputs.find(item => item.locale === publishLocale);
+  return result && output ? { result, output } : null;
+}
+
+function updatePublishPanel() {
+  const result = completedResults[Number(publishFileSelect.value)];
+  if (!result) return;
+  if (!result.data.outputs.some(item => item.locale === publishLocale)) {
+    publishLocale = result.data.outputs[0]?.locale || '';
+  }
+  publishLanguages.replaceChildren();
+  for (const output of result.data.outputs) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `publish-language${output.locale === publishLocale ? ' active' : ''}`;
+    button.setAttribute('aria-pressed', String(output.locale === publishLocale));
+    button.textContent = output.locale === 'TH' ? 'ไทย' : 'English';
+    button.addEventListener('click', () => {
+      publishLocale = output.locale;
+      updatePublishPanel();
+    });
+    publishLanguages.append(button);
+  }
+  publishSummary.textContent = `${result.data.paragraphCount} ย่อหน้า · ${publishLocale === 'TH' ? 'ภาษาไทย' : 'English'}`;
+}
+
+publishFileSelect.addEventListener('change', updatePublishPanel);
+publishCopyButton.addEventListener('click', async () => {
+  const selected = getPublishOutput();
+  if (!selected) return;
+  try {
+    await navigator.clipboard.writeText(selected.output.html);
+  } catch {
+    const temporary = document.createElement('textarea');
+    temporary.value = selected.output.html;
+    temporary.style.position = 'fixed';
+    temporary.style.opacity = '0';
+    document.body.append(temporary);
+    temporary.select();
+    document.execCommand('copy');
+    temporary.remove();
+  }
+  publishCopyButton.textContent = 'คัดลอกแล้ว';
+  window.setTimeout(() => { publishCopyButton.textContent = 'คัดลอก HTML'; }, 1600);
+});
+
+publishDownloadButton.addEventListener('click', () => {
+  const selected = getPublishOutput();
+  if (!selected) return;
+  const suffix = selected.output.locale.toLowerCase();
+  downloadText(`${selected.result.file.name.replace(/\.docx$/i, '')}-${suffix}.html`, selected.output.html);
+});
 
 function downloadText(filename, value) {
   const blob = new Blob([value], { type: 'text/html;charset=utf-8' });
