@@ -371,3 +371,40 @@ a { color: inherit; }
   .workspace-app .publish-empty { margin: 18px 0; }
   .workspace-app .publish-foot { margin-top: 24px; }
 }
+
+/* News Code workspace refresh */
+:root { --ink: #202d35; --muted: #687a7d; --line: #dce6e3; --blue: #126c64; --blue-dark: #07534d; --shadow: 0 8px 28px rgba(32,70,65,.06); }
+.workspace-app { background: #f1f5f3; }
+.workspace-app .topbar { background: #fff; border-color: #e0eae6; }
+.workspace-app .brand { color: #173f3a; letter-spacing: -.03em; }
+.workspace-app .brand-mark { color: #fff; background: #126c64; box-shadow: none; font-family: inherit; }
+.workspace-app .shell { max-width: 1700px; grid-template-rows: 76px minmax(0, 1fr) 24px; }
+.workspace-app .intro { color: #183b36; background: #e5f1ec; box-shadow: none; border: 1px solid #d3e7dd; }
+.workspace-app .intro .eyebrow { color: #398176; }
+.workspace-app .intro-copy { color: #577b72; }
+.workspace-app .workflow-step { color: #67837c; }
+.workspace-app .workflow-step b { color: #5f7d75; border-color: #bad1c8; background: #f5faf7; }
+.workspace-app .workflow-step.active { color: #125f57; }
+.workspace-app .workflow-step.active b { color: white; border-color: #126c64; background: #126c64; box-shadow: none; }
+.workspace-app .workflow-rule { background: #bcd4ca; }
+.workspace-app .panel, .workspace-app .guide-card, .workspace-app .results, .workspace-app .publish-panel { border-color: #dce8e2; border-radius: 12px; box-shadow: var(--shadow); }
+.workspace-app .panel-heading { background: #fbfdfc; }
+.workspace-app .section-kicker { color: #6f9689; }
+.workspace-app .dropzone { background: #f4faf7; border-color: #99c8b7; }
+.workspace-app .dropzone:hover, .workspace-app .dropzone:focus-within, .workspace-app .dropzone.dragging { border-color: #126c64; background: #eaf6f0; }
+.workspace-app .upload-icon, .workspace-app .guide-icon, .workspace-app .publish-icon { color: #126c64; background: #e3f3eb; border-color: #d2eadf; box-shadow: none; }
+.workspace-app .drop-subtitle span { color: #126c64; }
+.workspace-app .button.primary { color: #fff; background: #126c64; box-shadow: none; }
+.workspace-app .button.primary:hover:not(:disabled) { background: #09564f; box-shadow: none; }
+.workspace-app .button:disabled { color: #a8b6b1; background: #edf1ef; }
+.workspace-app .check-row input:checked + .check-custom { border-color: #126c64; background: #126c64; }
+.workspace-app .file-row, .workspace-app .format-item { background: #fbfdfc; border-color: #e2ebe6; }
+.workspace-app .doc-icon, .workspace-app .language-tag { color: #126c64; background: #e6f4ec; }
+.workspace-app .empty-preview { background: #f9fcfa; border-color: #c5dbd0; }
+.workspace-app .empty-preview-mark { color: #126c64; background: #e6f4ec; }
+.workspace-app .publish-language.active { color: #126c64; border-color: #75b5a0; background: #eaf6ef; }
+.workspace-app .output-preview { font-size: 12px; line-height: 1.75; }
+.workspace-app .code-output { font-size: 11px; color: #d5ebe1; background: #1d3431; }
+.workspace-app .code-label { color: #668079; }
+.workspace-app .results-heading h2, .workspace-app .panel-heading h2, .workspace-app .publish-heading h2 { color: #193e37; }
+@media (max-width: 720px), (max-height: 600px) { .workspace-app .shell { grid-template-rows: none; } }
