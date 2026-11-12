@@ -13,6 +13,8 @@ const clearButton = document.querySelector('#clear');
 const statusNode = document.querySelector('#status');
 const resultSection = document.querySelector('#results');
 const resultCards = document.querySelector('#result-cards');
+const resultFileTabs = document.querySelector('#result-file-tabs');
+const resultLanguageTabs = document.querySelector('#result-language-tabs');
 const outputWorkspace = document.querySelector('#output-workspace');
 const publishEmpty = document.querySelector('#publish-empty');
 const publishControls = document.querySelector('#publish-controls');
@@ -487,6 +489,8 @@ function updateWorkflow(stage) {
 
 function resetResults() {
   resultCards.replaceChildren();
+  resultFileTabs.replaceChildren();
+  resultLanguageTabs.replaceChildren();
   resultSection.hidden = true;
   outputWorkspace.classList.remove('has-results');
   completedResults = [];
@@ -551,6 +555,7 @@ function addFiles(files) {
 
 function renderResults(results) {
   resultCards.replaceChildren();
+  resultFileTabs.replaceChildren();
   completedResults = results;
   publishFileSelect.replaceChildren();
   for (const result of results) {
@@ -558,6 +563,17 @@ function renderResults(results) {
     option.value = String(publishFileSelect.options.length);
     option.textContent = result.file.name;
     publishFileSelect.append(option);
+    const fileTab = document.createElement('button');
+    fileTab.type = 'button';
+    fileTab.className = 'result-file-tab';
+    fileTab.textContent = result.file.name;
+    fileTab.title = result.file.name;
+    const fileIndex = publishFileSelect.options.length - 1;
+    fileTab.addEventListener('click', () => {
+      publishFileSelect.value = String(fileIndex);
+      updatePublishPanel();
+    });
+    resultFileTabs.append(fileTab);
     const card = document.createElement('article');
     card.className = 'result-card';
     const head = document.createElement('div');
@@ -575,6 +591,7 @@ function renderResults(results) {
     for (const output of result.data.outputs) {
       const section = document.createElement('section');
       section.className = 'language-output';
+      section.dataset.locale = output.locale;
       const sectionHead = document.createElement('div');
       sectionHead.className = 'language-output-head';
       const label = document.createElement('div');
@@ -677,12 +694,21 @@ function getPublishOutput() {
 }
 
 function updatePublishPanel() {
-  const result = completedResults[Number(publishFileSelect.value)];
+  const selectedIndex = Number(publishFileSelect.value);
+  const result = completedResults[selectedIndex];
   if (!result) return;
   if (!result.data.outputs.some(item => item.locale === publishLocale)) {
     publishLocale = result.data.outputs[0]?.locale || '';
   }
   publishLanguages.replaceChildren();
+  resultLanguageTabs.replaceChildren();
+  Array.from(resultCards.children).forEach((card, index) => { card.hidden = index !== selectedIndex; });
+  Array.from(resultFileTabs.children).forEach((tab, index) => {
+    tab.classList.toggle('active', index === selectedIndex);
+    tab.setAttribute('aria-pressed', String(index === selectedIndex));
+  });
+  const selectedCard = resultCards.children[selectedIndex];
+  selectedCard?.querySelectorAll('.language-output').forEach(section => { section.hidden = section.dataset.locale !== publishLocale; });
   for (const output of result.data.outputs) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -694,6 +720,13 @@ function updatePublishPanel() {
       updatePublishPanel();
     });
     publishLanguages.append(button);
+    const resultTab = document.createElement('button');
+    resultTab.type = 'button';
+    resultTab.className = `result-language-tab${output.locale === publishLocale ? ' active' : ''}`;
+    resultTab.setAttribute('aria-pressed', String(output.locale === publishLocale));
+    resultTab.textContent = output.locale === 'TH' ? 'ภาษาไทย' : 'English';
+    resultTab.addEventListener('click', () => { publishLocale = output.locale; updatePublishPanel(); });
+    resultLanguageTabs.append(resultTab);
   }
   publishSummary.textContent = `${result.data.paragraphCount} ย่อหน้า · ${publishLocale === 'TH' ? 'ภาษาไทย' : 'English'}`;
 }

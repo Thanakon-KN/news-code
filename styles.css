@@ -448,3 +448,21 @@ a { color: inherit; }
   .workspace-app .actions { margin-top: 12px; }
   .workspace-app .output-preview, .workspace-app .code-output { height: 180px; }
 }
+
+/* File and language tabs keep the active result large. */
+.workspace-app .result-file-tabs, .workspace-app .result-language-tabs { display: flex; flex: 0 0 auto; gap: 8px; overflow-x: auto; padding: 4px 0 9px; }
+.workspace-app .result-file-tab, .workspace-app .result-language-tab { flex: 0 0 auto; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 40px; padding: 9px 16px; border: 1px solid #dcded8; border-radius: 9px; color: #536761; background: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+.workspace-app .result-file-tab.active, .workspace-app .result-language-tab.active { border-color: #126c64; color: #fff; background: #126c64; }
+.workspace-app .result-cards { display: block; flex: 1; min-height: 0; overflow: auto; }
+.workspace-app .result-card[hidden], .workspace-app .language-output[hidden] { display: none !important; }
+.workspace-app .result-card:not([hidden]) { min-height: 100%; display: flex; flex-direction: column; }
+.workspace-app .result-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.workspace-app .language-output:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.workspace-app .output-content { flex: 1; min-height: 0; }
+.workspace-app .output-column { min-height: 0; display: flex; flex-direction: column; }
+.workspace-app .output-preview, .workspace-app .code-output { flex: 1; min-height: 240px; height: auto; font-size: 14px; }
+.workspace-app .preview-label, .workspace-app .code-label { font-size: 11px; }
+.workspace-app .result-title strong { font-size: 13px; }
+@media (max-width: 720px), (max-height: 600px) {
+  .workspace-app .output-preview, .workspace-app .code-output { height: 280px; min-height: 280px; }
+}
